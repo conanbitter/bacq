@@ -189,7 +189,7 @@ func (km *KMeans) calcSegments() {
 				minDist := chunk[i].color.Distance(km.centroids[oldSeg].LevelConvert(oldLvl, km.levels))
 				for c := range km.centroids {
 					for l := uint(1); l <= km.levels; l++ {
-						dist := chunk[i].color.Distance(km.centroids[c])
+						dist := chunk[i].color.Distance(km.centroids[c].LevelConvert(l, km.levels))
 						if dist < minDist {
 							minDist = dist
 							newSeg = c
@@ -253,7 +253,7 @@ func (km *KMeans) printState(attempt int, step int, start time.Time) {
 func (km *KMeans) CalcError() float64 {
 	score := float64(0)
 	for _, point := range km.points {
-		score += math.Sqrt(point.color.Distance(km.centroids[point.segment])) * float64(point.count)
+		score += math.Sqrt(point.color.Distance(km.centroids[point.segment].LevelConvert(point.level, km.levels))) * float64(point.count)
 	}
 	return score
 }
