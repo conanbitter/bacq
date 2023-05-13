@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"image"
 	"log"
 	"os"
@@ -38,12 +39,30 @@ func imageToData(img image.Image) []IntColor {
 	return result
 }
 
-func convertImage(inputFilename string, outputFilename string, paletteFile string, indexer ImageIndexer) {
-	pal := PaletteLoad(paletteFile)
-	img, err := imageLoad(inputFilename)
-	if err != nil {
-		panic(err)
+func convertImage(inputImage any, outputFilename string, palette any, indexer ImageIndexer) {
+	var err error
+
+	var pal Palette
+	switch palt := palette.(type) {
+	case Palette:
+		pal = palt
+	case string:
+		pal = PaletteLoad(palt)
+	default:
+		panic(errors.New("frong palette type"))
 	}
+
+	var img image.Image
+	switch imgt := inputImage.(type) {
+	case image.Image:
+		img = imgt
+	case string:
+		img, err = imageLoad(imgt)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	width := img.Bounds().Size().X
 	height := img.Bounds().Size().Y
 
