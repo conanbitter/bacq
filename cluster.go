@@ -274,6 +274,7 @@ func (km *KMeans) Run() {
 	}
 	fmt.Printf("\nMost successful attempt is %d\n", km.bestAtt)
 	fmt.Print(km.errors)
+	fmt.Println()
 }
 
 func (km *KMeans) calcPalette() Palette {

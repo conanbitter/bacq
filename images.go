@@ -49,7 +49,7 @@ func convertImage(inputImage any, outputFilename string, palette any, indexer Im
 	case string:
 		pal = PaletteLoad(palt)
 	default:
-		panic(errors.New("frong palette type"))
+		panic(errors.New("wrong palette type"))
 	}
 
 	var img image.Image
