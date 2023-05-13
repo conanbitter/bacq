@@ -9,7 +9,6 @@ import (
 	"image/color"
 	_ "image/jpeg"
 	"image/png"
-	_ "image/png"
 
 	_ "golang.org/x/image/tiff"
 )

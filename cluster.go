@@ -16,6 +16,7 @@ type ColorPoint struct {
 	segment  int
 	count    uint64
 	distance float64
+	level    uint
 }
 
 type KMeans struct {
@@ -23,6 +24,7 @@ type KMeans struct {
 	centroids []FloatColor
 
 	colors    int
+	levels    uint
 	poinCount uint64
 
 	totalDistance float64
@@ -44,8 +46,8 @@ func swapPoints(left, right *ColorPoint) {
 	*left, *right = *right, *left
 }
 
-func NewQuantizier(colors int, steps int, attempt int) *KMeans {
-	return &KMeans{colors: colors, maxSteps: steps, maxAttempt: attempt}
+func NewQuantizier(colors int, levels uint, steps int, attempt int) *KMeans {
+	return &KMeans{colors: colors, levels: levels, maxSteps: steps, maxAttempt: attempt}
 }
 
 func (km *KMeans) Input(image []IntColor) {
@@ -85,6 +87,7 @@ func (km *KMeans) Input(image []IntColor) {
 					km.points = append(km.points, ColorPoint{
 						color:    FloatColor{float64(r) / 255, float64(g) / 255, float64(b) / 255},
 						segment:  0,
+						level:    km.levels,
 						count:    cube[r][g][b],
 						distance: math.MaxFloat64})
 				}
@@ -147,9 +150,10 @@ func (km *KMeans) calcCentroids() {
 	for _, point := range km.points {
 		sizes[point.segment] += point.count
 		c := &newCentroids[point.segment]
-		c.R += point.color.R * float64(point.count)
-		c.G += point.color.G * float64(point.count)
-		c.B += point.color.B * float64(point.count)
+		k := float64(km.levels) / float64(point.level)
+		c.R += point.color.R * k * float64(point.count)
+		c.G += point.color.G * k * float64(point.count)
+		c.B += point.color.B * k * float64(point.count)
 	}
 	km.totalDistance = 0
 	for i := range km.centroids {
@@ -179,17 +183,23 @@ func (km *KMeans) calcSegments() {
 		go func(chunk []ColorPoint) {
 			for i := range chunk {
 				oldSeg := chunk[i].segment
+				oldLvl := chunk[i].level
 				newSeg := oldSeg
-				minDist := chunk[i].color.Distance(km.centroids[oldSeg])
+				newLvl := oldLvl
+				minDist := chunk[i].color.Distance(km.centroids[oldSeg].LevelConvert(oldLvl, km.levels))
 				for c := range km.centroids {
-					dist := chunk[i].color.Distance(km.centroids[c])
-					if dist < minDist {
-						minDist = dist
-						newSeg = c
+					for l := uint(1); l <= km.levels; l++ {
+						dist := chunk[i].color.Distance(km.centroids[c])
+						if dist < minDist {
+							minDist = dist
+							newSeg = c
+							newLvl = l
+						}
 					}
 				}
-				if oldSeg != newSeg {
+				if oldSeg != newSeg || oldLvl != newLvl {
 					chunk[i].segment = newSeg
+					chunk[i].level = newLvl
 					mt.Lock()
 					km.pointsChanged++
 					mt.Unlock()
@@ -278,11 +288,14 @@ func (km *KMeans) Run() {
 }
 
 func (km *KMeans) calcPalette() Palette {
-	result := NewPalette(km.colors)
-	for i, c := range km.centroids {
-		result[i] = IntColor{int(c.R * 255), int(c.G * 255), int(c.B * 255)}.Normalized()
+	result := make(Palette, 0, km.colors*int(km.levels)+1)
+	for _, c := range km.centroids {
+		for l := uint(1); l <= km.levels; l++ {
+			result = append(result, c.LevelConvert(l, km.levels).ToIntColor().Normalized())
+		}
 	}
-	result.Sort()
+	result = append(result, IntColor{0, 0, 0})
+	//result.Sort()
 	return result
 }
 

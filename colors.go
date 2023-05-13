@@ -2,6 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
+	"log"
 	"math"
 	"os"
 	"sort"
@@ -45,6 +49,20 @@ func (color FloatColor) Distance(other FloatColor) float64 {
 func (color FloatColor) ToIntColor() IntColor {
 	norm := color.Normalized()
 	return IntColor{int(norm.R * 255), int(norm.G * 255), int(norm.B * 255)}
+}
+
+func (color FloatColor) LevelConvert(level uint, levelsTotal uint) FloatColor {
+	if level == levelsTotal {
+		return color
+	}
+	if level == 0 {
+		return FloatColor{0.0, 0.0, 0.0}
+	}
+	k := float64(level) / float64(levelsTotal)
+	return FloatColor{
+		color.R * k,
+		color.G * k,
+		color.B * k}
 }
 
 //===== INT COLOR =======
@@ -147,4 +165,27 @@ func PaletteLoad(filename string) Palette {
 		panic(err)
 	}
 	return *result
+}
+
+func (pal Palette) SavePreview(width int, filename string) {
+	height := pal.Len()/width + 1
+	oimg := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			index := y*width + x
+			if index >= pal.Len() {
+				break
+			}
+			coli := pal[index]
+			oimg.SetRGBA(x, y, color.RGBA{uint8(coli.R), uint8(coli.G), uint8(coli.B), 255})
+		}
+	}
+	outf, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer outf.Close()
+	if err = png.Encode(outf, oimg); err != nil {
+		log.Printf("failed to encode: %v", err)
+	}
 }
