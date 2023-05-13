@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"log"
 	"os"
@@ -38,7 +39,23 @@ func imageToData(img image.Image) []IntColor {
 	return result
 }
 
-func convertImage(inputImage any, outputFilename string, palette any, indexer ImageIndexer) {
+func brightnessCorrection(index int, level int, totalLevels int) int {
+	if level == totalLevels {
+		return index
+	}
+	if level == 0 {
+		return -1
+	}
+	currentLevel := index%totalLevels + 1
+	color := index / totalLevels
+	newLevel := int(float64(currentLevel) * float64(level) / float64(totalLevels))
+	if newLevel == 0 {
+		return -1
+	}
+	return color*totalLevels + newLevel - 1
+}
+
+func convertImage(inputImage any, outputFilename string, palette any, indexer ImageIndexer, level uint, totalLevels uint) {
 	var err error
 
 	var pal Palette
@@ -72,7 +89,17 @@ func convertImage(inputImage any, outputFilename string, palette any, indexer Im
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			index := y*width + x
-			coli := pal[imgIndexed[index]]
+			colp := brightnessCorrection(imgIndexed[index], int(level), int(totalLevels))
+			if colp >= pal.Len() {
+				panic(fmt.Errorf("colors: %d, level:%d, original:%d", colp, level, imgIndexed[index]))
+			}
+			if colp == -1 {
+				colp = pal.Len() - 1
+			}
+			if colp < -1 {
+				panic(fmt.Errorf("colors: %d, level:%d, original:%d", colp, level, imgIndexed[index]))
+			}
+			coli := pal[colp]
 			oimg.SetRGBA(x, y, color.RGBA{uint8(coli.R), uint8(coli.G), uint8(coli.B), 255})
 		}
 	}
