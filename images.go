@@ -2,9 +2,12 @@ package main
 
 import (
 	"image"
+	"log"
 	"os"
 
+	"image/color"
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
 
 	_ "golang.org/x/image/tiff"
@@ -33,4 +36,34 @@ func imageToData(img image.Image) []IntColor {
 		}
 	}
 	return result
+}
+
+func convertImage(inputFilename string, outputFilename string, paletteFile string, indexer ImageIndexer) {
+	pal := PaletteLoad(paletteFile)
+	img, err := imageLoad(inputFilename)
+	if err != nil {
+		panic(err)
+	}
+	width := img.Bounds().Size().X
+	height := img.Bounds().Size().Y
+
+	imgData := imageToData(img)
+	imgIndexed := indexer(imgData, pal, width, height)
+
+	oimg := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			index := y*width + x
+			coli := pal[imgIndexed[index]]
+			oimg.SetRGBA(x, y, color.RGBA{uint8(coli.R), uint8(coli.G), uint8(coli.B), 255})
+		}
+	}
+	outf, err := os.Create(outputFilename)
+	if err != nil {
+		panic(err)
+	}
+	defer outf.Close()
+	if err = png.Encode(outf, oimg); err != nil {
+		log.Printf("failed to encode: %v", err)
+	}
 }
