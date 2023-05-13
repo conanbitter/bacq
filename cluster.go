@@ -32,7 +32,7 @@ type KMeans struct {
 	pointRanges [][]ColorPoint
 
 	bestError   float64
-	bestPalette *Palette
+	bestPalette Palette
 	bestAtt     int
 	errors      []float64
 
@@ -44,32 +44,18 @@ func swapPoints(left, right *ColorPoint) {
 	*left, *right = *right, *left
 }
 
-func NewPalCalculator(colors int, steps int, attempt int) *KMeans {
-	if colors > 256 {
-		colors = 256
-	}
-	if colors < 1 {
-		colors = 1
-	}
+func NewQuantizier(colors int, steps int, attempt int) *KMeans {
 	return &KMeans{colors: colors, maxSteps: steps, maxAttempt: attempt}
 }
 
-func (km *KMeans) Input(images FileSequence) {
+func (km *KMeans) Input(image []IntColor) {
 	var cube [256][256][256]uint64
-	fmt.Println("Loading images...")
 
-	isEnd, imgName := images()
-	for !isEnd {
-		img, err := imageLoad(imgName)
-		if err != nil {
-			panic(err)
-		}
-		for _, data := range imageToData(img) {
-			cube[data.R][data.G][data.B]++
-		}
-
-		isEnd, imgName = images()
+	//for _, img := range images {
+	for _, data := range image {
+		cube[data.R][data.G][data.B]++
 	}
+	//}
 
 	colors_total := uint64(0)
 	for r := 0; r < 256; r++ {
@@ -83,13 +69,13 @@ func (km *KMeans) Input(images FileSequence) {
 	}
 
 	fmt.Printf("\n\nTotal number of colors: %d\n", colors_total)
+	if colors_total == 0 {
+		panic(errors.New("wrong input"))
+	}
 	if uint64(km.colors) > colors_total {
 		km.colors = int(colors_total)
 	}
 	km.poinCount = colors_total
-	if colors_total == 0 {
-		panic(errors.New("Wrong input"))
-	}
 
 	km.points = make([]ColorPoint, 0, colors_total)
 	for r := 0; r < 256; r++ {
@@ -181,28 +167,6 @@ func (km *KMeans) calcCentroids() {
 }
 
 func (km *KMeans) calcSegments() {
-	start := time.Now()
-	km.pointsChanged = 0
-	for i := range km.points {
-		oldSeg := km.points[i].segment
-		newSeg := oldSeg
-		minDist := km.points[i].color.Distance(km.centroids[oldSeg])
-		for c := range km.centroids {
-			dist := km.points[i].color.Distance(km.centroids[c])
-			if dist < minDist {
-				minDist = dist
-				newSeg = c
-			}
-		}
-		if oldSeg != newSeg {
-			km.points[i].segment = newSeg
-			km.pointsChanged++
-		}
-	}
-	fmt.Printf("Segments: %s\n", time.Since(start))
-}
-
-func (km *KMeans) calcSegmentsMt() {
 	var (
 		mt sync.Mutex
 		wg sync.WaitGroup
@@ -291,7 +255,7 @@ func (km *KMeans) Run() {
 	for a := 1; a < km.maxAttempt+1; a++ {
 		km.initCentroids()
 		for i := 1; i < km.maxSteps+1; i++ {
-			km.calcSegmentsMt()
+			km.calcSegments()
 			if km.pointsChanged == 0 {
 				km.printState(a, i, startTime)
 				break
@@ -299,7 +263,7 @@ func (km *KMeans) Run() {
 			km.calcCentroids()
 			km.printState(a, i, startTime)
 		}
-		km.calcSegmentsMt()
+		km.calcSegments()
 		colorErr := km.CalcError()
 		if a == 1 || colorErr < km.bestError {
 			km.bestAtt = a
@@ -312,15 +276,15 @@ func (km *KMeans) Run() {
 	fmt.Print(km.errors)
 }
 
-func (km *KMeans) calcPalette() *Palette {
-	result := &Palette{Size: km.colors}
+func (km *KMeans) calcPalette() Palette {
+	result := NewPalette(km.colors)
 	for i, c := range km.centroids {
-		result.Colors[i] = IntColor{int(c.R * 255), int(c.G * 255), int(c.B * 255)}.Normalized()
+		result[i] = IntColor{int(c.R * 255), int(c.G * 255), int(c.B * 255)}.Normalized()
 	}
 	result.Sort()
 	return result
 }
 
-func (km *KMeans) GetPalette() *Palette {
+func (km *KMeans) GetPalette() Palette {
 	return km.bestPalette
 }

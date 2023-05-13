@@ -82,6 +82,10 @@ func (color IntColor) ToFloatColor() FloatColor {
 
 //===== PALETTE =======
 
+func NewPalette(colors int) Palette {
+	return make([]IntColor, colors)
+}
+
 func (pal Palette) Len() int {
 	return len(pal)
 }
