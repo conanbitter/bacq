@@ -55,6 +55,25 @@ func brightnessCorrection(index int, level int, totalLevels int) int {
 	return color*totalLevels + newLevel - 1
 }
 
+func dataToImageF(data []FloatColor, outputFilename string, width int, height int) {
+	oimg := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			index := y*width + x
+			col := data[index].ToIntColor()
+			oimg.SetRGBA(x, y, color.RGBA{uint8(col.R), uint8(col.G), uint8(col.B), 255})
+		}
+	}
+	outf, err := os.Create(outputFilename)
+	if err != nil {
+		panic(err)
+	}
+	defer outf.Close()
+	if err = png.Encode(outf, oimg); err != nil {
+		log.Printf("failed to encode: %v", err)
+	}
+}
+
 func convertImage(inputImage any, outputFilename string, palette any, indexer ImageIndexer, level uint, totalLevels uint) {
 	var err error
 
